@@ -124,6 +124,7 @@ services:
 
   # Elasticsearch 
   elasticsearch:
+    container_name: elasticsearch
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
     environment:
       - discovery.type=single-node
@@ -135,35 +136,6 @@ services:
       - esdata:/usr/share/elasticsearch/data
     networks:
       - debezium-network
-
-  # Schema Registry (Formart Avro)
-  # schema-registry:
-  #   image: confluentinc/cp-schema-registry:7.8.0
-  #   container_name: schema-registry
-  #   ports:
-  #      - "8081:8081"
-  #   depends_on:
-  #      kafka:
-  #       condition: service_healthy
-  #   environment:
-  #     # Connect to kafka broker directly
-  #      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "kafka:9092"
-  #     #  SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: "kafka:2181"
-
-  #     # Schema registry settings
-  #      SCHEMA_REGISTRY_HOST_NAME: schema-registry
-  #      SCHEMA_REGISTRY_LISTENERS: "http://0.0.0.0:8081"
-  #      SCHEMA_REGISTRY_DEBUG: "true"
-
-  #     # Security
-  #      SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL: "PLAINTEXT"
-
-  #     # Topic setting 
-  #      SCHEMA_REGISTRY_KAFKASTORE_TOPIC: _schemas
-  #      SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR: 1
-    
-  #   volumes:
-  #     - schema_registry_data:/etc/schema-registry/data
 
   schema-registry:
     image: confluentinc/cp-schema-registry:7.8.0
@@ -222,6 +194,33 @@ services:
           cpus: '0.5'
     networks:
       - debezium-network
+
+  ksqldb-server:
+    image: confluentinc/cp-ksqldb-server:7.6.2
+    container_name: ksqldb-server
+    depends_on:
+      - kafka
+      - schema-registry
+    ports:
+      - "8088:8088"   # REST API port 
+    environment:
+      KSQL_CONFIG_DIR: "/etc/ksql"
+      KSQL_BOOTSTRAP_SERVERS: kafka:9092
+      KSQL_KSQL_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      KSQL_KSQL_CONNECT_URL: http://debezium-kafka-connect:8083
+      KSQL_LISTENERS: http://0.0.0.0:8088
+    networks:
+      - debezium-network
+  kafkacat:
+    image: edenhill/kafkacat:1.6.0
+    container_name: kafkacat
+    depends_on:
+      - kafka
+    entrypoint: /bin/sh
+    tty: true
+    networks:
+      - debezium-network
+
 volumes:
   pg_data_cdc:
   debezium_plugins:
